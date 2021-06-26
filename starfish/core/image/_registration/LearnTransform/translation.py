@@ -1,5 +1,5 @@
 import numpy as np
-from skimage.feature import register_translation
+from skimage.registration import phase_cross_correlation
 from skimage.transform._geometric import SimilarityTransform
 
 from starfish.core.image._registration.transforms_list import TransformsList
@@ -19,7 +19,7 @@ class Translation(LearnTransformAlgorithm):
     axes : Axes
         The axes {r, ch, zplane} to iterate over
     reference_stack : ImageStack
-        The target image used in :py:func:`skimage.feature.register_translation`
+        The target image used in :py:func:`skimage.registration.phase_cross_correlation`
     upsampling : int
         upsampling factor (default=1). See :py:func:`~skimage.registration.phase_cross_correlation`
         for an explanation of this parameter. In brief, this parameter determines the resolution of
@@ -54,18 +54,22 @@ class Translation(LearnTransformAlgorithm):
         """
 
         transforms = TransformsList()
-        reference_image = np.squeeze(self.reference_stack.xarray)
+        reference_image = np.squeeze(self.reference_stack.xarray.data)
         for a in stack.axis_labels(self.axes):
-            target_image = np.squeeze(stack.sel({self.axes: a}).xarray)
+
+            target_image = np.squeeze(stack.sel({self.axes: a}).xarray.data)
             if len(target_image.shape) != 2:
                 raise ValueError(
                     f"Only axes: {self.axes.value} can have a length > 1, "
                     f"please use the MaxProj filter."
                 )
 
-            shift, error, phasediff = register_translation(src_image=target_image,
-                                                           target_image=reference_image,
-                                                           upsample_factor=self.upsampling)
+            shift, error, phasediff = phase_cross_correlation(
+                reference_image=target_image,
+                moving_image=reference_image,
+                upsample_factor=self.upsampling,
+            )
+
             if verbose:
                 print(f"For {self.axes}: {a}, Shift: {shift}, Error: {error}")
             selectors = {self.axes: a}
